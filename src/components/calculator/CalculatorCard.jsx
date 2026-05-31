@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TEXAS_CITIES, HOME_SIZES, ROOF_SHAPES, AGE_BRACKETS, MATERIALS, calculateEstimate, getContractors, fmt } from '@/lib/texasData'
 
 const STEPS = ['Location', 'Your home', 'Roof shape', 'Material']
@@ -34,19 +34,196 @@ function ShapeSVG({ shape }) {
   )
 }
 
-// ── ANIMATED BAR ──
+// ── ANIMATED BAR — fixed: useEffect not useState ──
 function Bar({ pct, color }) {
   const [w, setW] = useState(0)
-  useState(() => { setTimeout(() => setW(pct), 400) })
+  useEffect(() => {
+    const t = setTimeout(() => setW(pct), 400)
+    return () => clearTimeout(t)
+  }, [pct])
   return (
     <div style={{ flex:1, height:18, background:'var(--cream2)', borderRadius:4, overflow:'hidden' }}>
-      <div style={{ height:'100%', width:`${w}%`, background:color, borderRadius:4, transition:'width 1s cubic-bezier(0.4,0,0.2,1)' }}/>
+      <div style={{ height:'100%', width:`${w}%`, background:color, borderRadius:4, transition:'width 1.1s cubic-bezier(0.4,0,0.2,1)' }}/>
     </div>
   )
 }
 
+// ── RESULTS PANEL — extracted as a proper component ──
+function ResultsPanel({ estimate, onRestart }) {
+  const { totalLow, totalMid, totalHigh, matMid, labMid, disposal, permit } = estimate
+  const cityName   = estimate.city?.city     || 'Dallas'
+  const sizeName   = estimate.homeSize?.label || 'Medium'
+  const shapeName  = estimate.shape?.shape   || 'Gable'
+  const matName    = estimate.material?.name || 'Asphalt shingles'
+
+  const tot  = matMid + labMid + disposal + permit
+  const pcts = [
+    Math.round(matMid   / tot * 100),
+    Math.round(labMid   / tot * 100),
+    Math.round(disposal / tot * 100),
+    Math.round(permit   / tot * 100),
+  ]
+
+  const breakdown = [
+    { dot:'#C8572A', name:'Materials', sub:'Shingles, underlayment, flashing, ridge cap', amt: fmt(matMid)   },
+    { dot:'#3D4A5C', name:'Labor',     sub:'Tear-off, installation, cleanup',             amt: fmt(labMid)   },
+    { dot:'#D4A853', name:'Disposal',  sub:'Dumpster rental, haul-away',                  amt: fmt(disposal) },
+    { dot:'#9CA3AF', name:'Permit',    sub:'City / county building permit',                amt: fmt(permit)   },
+  ]
+
+  const bars = [
+    { label:'Materials', pct:pcts[0], color:'#C8572A' },
+    { label:'Labor',     pct:pcts[1], color:'#3D4A5C' },
+    { label:'Disposal',  pct:pcts[2], color:'#D4A853' },
+    { label:'Permit',    pct:pcts[3], color:'#9CA3AF' },
+  ]
+
+  const tiers = [
+    { lbl:'Budget',   price:fmt(totalLow),  sub:'Entry-grade materials', mid:false },
+    { lbl:'Standard', price:fmt(totalMid),  sub:'Mid-grade quality',     mid:true  },
+    { lbl:'Premium',  price:fmt(totalHigh), sub:'Top-grade materials',   mid:false },
+  ]
+
+  const contractors = getContractors(cityName)
+
+  const actions = [
+    { icon:'📄', title:'Save estimate as PDF',            desc:'Free download — no email required'       },
+    { icon:'🏠', title:'Best roofing materials for Texas', desc:'Heat, hail & humidity resistant options' },
+    { icon:'❓', title:'Questions to ask your contractor', desc:"Don't get ripped off — know what to ask" },
+  ]
+
+  return (
+    <div>
+      {/* Restart */}
+      <button onClick={onRestart} style={{ display:'flex', alignItems:'center', gap:6, color:'var(--burnt)', fontSize:12, fontWeight:500, padding:'14px 26px 0', background:'none', border:'none', cursor:'pointer' }}>
+        ← Start over
+      </button>
+
+      {/* Hero range */}
+      <div style={{ background:'var(--slate)', padding:'22px 26px 20px' }}>
+        <div style={{ fontSize:10.5, textTransform:'uppercase', letterSpacing:'0.1em', color:'rgba(255,255,255,0.4)', marginBottom:5 }}>
+          Your estimated replacement cost
+        </div>
+        <div style={{ fontFamily:'var(--font-display)', fontSize:38, fontWeight:900, color:'#fff', lineHeight:1 }}>
+          {fmt(totalLow)} – <span style={{ color:'var(--burnt-light)' }}>{fmt(totalHigh)}</span>
+        </div>
+        <div style={{ fontSize:11.5, color:'rgba(255,255,255,0.38)', marginTop:7, lineHeight:1.6 }}>
+          {sizeName} home · {shapeName} roof · {matName} · {cityName}, TX
+        </div>
+        <div style={{ display:'inline-flex', alignItems:'center', gap:5, background:'rgba(45,122,79,0.2)', borderRadius:20, padding:'4px 10px', fontSize:10.5, color:'#6FCF97', marginTop:10 }}>
+          ✓ No personal information was collected
+        </div>
+      </div>
+
+      {/* Breakdown */}
+      <div style={{ padding:'20px 26px' }}>
+        <div style={{ fontSize:10.5, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--muted)', fontWeight:500, marginBottom:14 }}>
+          Where your money goes
+        </div>
+        {breakdown.map(item => (
+          <div key={item.name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'11px 0', borderBottom:'1px solid var(--cream2)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{ width:9, height:9, borderRadius:'50%', background:item.dot, flexShrink:0 }}/>
+              <div>
+                <div style={{ fontSize:13.5, color:'var(--slate)' }}>{item.name}</div>
+                <div style={{ fontSize:10.5, color:'var(--light)', marginTop:1 }}>{item.sub}</div>
+              </div>
+            </div>
+            <div style={{ fontSize:14.5, fontWeight:500, color:'var(--slate)' }}>{item.amt}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bar chart */}
+      <div style={{ padding:'0 26px 20px' }}>
+        <div style={{ fontSize:10.5, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--muted)', fontWeight:500, marginBottom:14 }}>
+          Cost distribution
+        </div>
+        {bars.map(b => (
+          <div key={b.label} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:9 }}>
+            <div style={{ fontSize:11, color:'var(--muted)', width:66, textAlign:'right', flexShrink:0 }}>{b.label}</div>
+            <Bar pct={b.pct} color={b.color}/>
+            <div style={{ fontSize:11, fontWeight:500, color:'var(--slate)', minWidth:30 }}>{b.pct}%</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tiers */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, padding:'0 26px 18px' }}>
+        {tiers.map(t => (
+          <div key={t.lbl} style={{ borderRadius:12, padding:'13px 10px', textAlign:'center', border:`1.5px solid ${t.mid ? 'var(--burnt)' : 'var(--cream2)'}`, position:'relative' }}>
+            {t.mid && (
+              <div style={{ position:'absolute', top:-8, left:'50%', transform:'translateX(-50%)', background:'var(--burnt)', color:'#fff', fontSize:9, letterSpacing:'0.05em', padding:'2px 8px', borderRadius:10, whiteSpace:'nowrap' }}>
+                Most common
+              </div>
+            )}
+            <div style={{ fontSize:9.5, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--muted)', marginBottom:5 }}>{t.lbl}</div>
+            <div style={{ fontFamily:'var(--font-display)', fontSize:19, fontWeight:700, color:'var(--slate)' }}>{t.price}</div>
+            <div style={{ fontSize:9.5, color:'var(--light)', marginTop:3 }}>{t.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Contractors */}
+      <div style={{ padding:'0 26px 18px' }}>
+        <div style={{ fontSize:10.5, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--muted)', fontWeight:500, marginBottom:10 }}>
+          Texas roofing companies near you
+        </div>
+        <div style={{ fontSize:12, color:'var(--muted)', marginBottom:14, lineHeight:1.55, padding:'10px 12px', background:'var(--cream)', borderRadius:8, borderLeft:'3px solid var(--burnt)' }}>
+          Contact these contractors directly — we never share your information with anyone.
+        </div>
+        {contractors.map(c => (
+          <div key={c.name} style={{ border:'1.5px solid var(--cream2)', borderRadius:12, padding:14, marginBottom:9, display:'flex', alignItems:'center', gap:13, background:'#fff' }}>
+            <div style={{ width:42, height:42, borderRadius:10, background:c.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#fff', flexShrink:0 }}>
+              {c.name.split(' ').map(w => w[0]).slice(0,2).join('')}
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:14, fontWeight:500, color:'var(--slate)' }}>{c.name}</div>
+              <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>{c.metro}</div>
+              <div style={{ display:'flex', gap:5, marginTop:6, flexWrap:'wrap' }}>
+                <span style={{ fontSize:9.5, padding:'2px 7px', borderRadius:6, background:'var(--green-bg)', color:'var(--green)' }}>{c.badge}</span>
+                {c.tags.map(t => (
+                  <span key={t} style={{ fontSize:9.5, padding:'2px 7px', borderRadius:6, background:'var(--cream2)', color:'var(--muted)' }}>{t}</span>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:'var(--burnt)', marginTop:5, fontWeight:500 }}>{c.phone}</div>
+            </div>
+            <div style={{ textAlign:'right', flexShrink:0 }}>
+              <div style={{ fontSize:11, color:'var(--gold)' }}>{c.stars}</div>
+              <div style={{ fontSize:10, color:'var(--light)', marginTop:2 }}>{c.reviews}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Actions */}
+      <div style={{ padding:'0 26px 22px', display:'flex', flexDirection:'column', gap:9 }}>
+        <div style={{ fontSize:10.5, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--muted)', fontWeight:500 }}>
+          What would you like to do next?
+        </div>
+        {actions.map(a => (
+          <div key={a.title} style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 14px', borderRadius:12, border:'1.5px solid var(--cream2)', cursor:'pointer', background:'#fff' }}>
+            <div style={{ width:36, height:36, borderRadius:9, background:'var(--cream)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>{a.icon}</div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:13.5, fontWeight:500, color:'var(--slate)' }}>{a.title}</div>
+              <div style={{ fontSize:10.5, color:'var(--muted)', marginTop:1 }}>{a.desc}</div>
+            </div>
+            <div style={{ color:'var(--light)', fontSize:16 }}>›</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer note */}
+      <div style={{ padding:'14px 26px 22px', fontSize:10.5, color:'var(--light)', lineHeight:1.65, borderTop:'1px solid var(--cream2)' }}>
+        Estimates based on 2025 Texas labor and material costs. Actual quotes may vary 15–25% depending on roof complexity, contractor availability, and material prices. This tool does not collect, store, or share any personal information.
+      </div>
+    </div>
+  )
+}
+
+// ── MAIN CALCULATOR ──
 export default function CalculatorCard() {
-  const [step, setStep] = useState(1)
+  const [step,     setStep]     = useState(1)
   const [city,     setCity]     = useState(null)
   const [homeSize, setHomeSize] = useState(null)
   const [shape,    setShape]    = useState(null)
@@ -58,7 +235,7 @@ export default function CalculatorCard() {
   const pickHomeSize = (h) => { setHomeSize(h); setTimeout(() => setStep(3), 200) }
 
   const canNext = () => {
-    if (step === 3) return shape && age
+    if (step === 3) return !!(shape && age)
     if (step === 4) return !!material
     return true
   }
@@ -70,9 +247,13 @@ export default function CalculatorCard() {
     const a = age      || AGE_BRACKETS[4]
     const m = material || MATERIALS[0]
     const result = calculateEstimate({
-      sqft: h.sqft, pitch: s.pitch, ageFactor: a.adj,
-      costLow: m.costLow, costHigh: m.costHigh,
-      laborMult: c.mult, permitCost: c.permit,
+      sqft:       h.sqft,
+      pitch:      s.pitch,
+      ageFactor:  a.adj,
+      costLow:    m.costLow,
+      costHigh:   m.costHigh,
+      laborMult:  c.mult,
+      permitCost: c.permit,
     })
     setEstimate({ ...result, city:c, homeSize:h, shape:s, age:a, material:m })
     setStep(5)
@@ -83,17 +264,15 @@ export default function CalculatorCard() {
     setShape(null); setAge(null); setMaterial(null); setEstimate(null)
   }
 
-  // ── shared card style ──
   const sel = (active) => ({
     border: `2px solid ${active ? 'var(--burnt)' : 'var(--cream2)'}`,
     background: active ? 'rgba(200,87,42,0.04)' : '#fff',
-    borderRadius: 12, cursor:'pointer', fontFamily:'var(--font-body)',
-    transition:'all 0.18s',
+    borderRadius: 12, cursor:'pointer', fontFamily:'var(--font-body)', transition:'all 0.18s',
   })
 
   return (
     <>
-    {/* HERO */}
+    {/* ── HERO ── */}
     <div style={{ position:'relative', background:'var(--slate)', padding:'50px 24px 80px', display:'flex', flexDirection:'column', alignItems:'center', overflow:'hidden' }}>
       <div style={{ position:'absolute', inset:0, opacity:0.05, backgroundImage:'linear-gradient(var(--burnt) 1px,transparent 1px),linear-gradient(90deg,var(--burnt) 1px,transparent 1px)', backgroundSize:'44px 44px' }}/>
       <div style={{ position:'absolute', top:-60, left:'50%', transform:'translateX(-50%)', width:500, height:360, background:'radial-gradient(ellipse,rgba(200,87,42,0.22) 0%,transparent 70%)', pointerEvents:'none' }}/>
@@ -116,13 +295,13 @@ export default function CalculatorCard() {
       </div>
     </div>
 
-    {/* CARD */}
+    {/* ── CARD ── */}
     <div style={{ maxWidth:660, margin:'-58px auto 0', padding:'0 18px 60px', position:'relative', zIndex:10 }}>
     <div style={{ background:'#fff', borderRadius:22, boxShadow:'var(--shadow-card)', overflow:'hidden' }}>
 
       {/* Progress bar */}
       <div style={{ height:3, background:'var(--cream2)' }}>
-        <div style={{ height:'100%', background:'linear-gradient(90deg,var(--burnt),var(--burnt-light))', width: step<=5 ? PROGRESS[step-1] : '100%', transition:'width 0.55s cubic-bezier(0.4,0,0.2,1)' }}/>
+        <div style={{ height:'100%', background:'linear-gradient(90deg,var(--burnt),var(--burnt-light))', width: PROGRESS[step-1] || '100%', transition:'width 0.55s cubic-bezier(0.4,0,0.2,1)' }}/>
       </div>
 
       {/* Step dots */}
@@ -131,7 +310,7 @@ export default function CalculatorCard() {
           {STEPS.map((label, i) => (
             <div key={label} style={{ display:'flex', alignItems:'center', flex: i < STEPS.length-1 ? 1 : 'none' }}>
               <div style={{ display:'flex', alignItems:'center', gap:7, fontSize:11.5, fontWeight:500, color: i+1===step ? 'var(--burnt)' : i+1<step ? 'var(--slate3)' : 'var(--light)', whiteSpace:'nowrap' }}>
-                <div style={{ width:22, height:22, borderRadius:'50%', border:'1.5px solid currentColor', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:600, background: i+1<step ? 'var(--slate)' : i+1===step ? 'var(--burnt)' : 'transparent', borderColor: i+1<step ? 'var(--slate)' : undefined, color: i+1<=step ? '#fff' : 'currentColor' }}>
+                <div style={{ width:22, height:22, borderRadius:'50%', border:'1.5px solid currentColor', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:600, background: i+1<step ? 'var(--slate)' : i+1===step ? 'var(--burnt)' : 'transparent', borderColor: i+1<=step ? (i+1<step ? 'var(--slate)' : 'var(--burnt)') : undefined, color: i+1<=step ? '#fff' : 'currentColor' }}>
                   {i+1 < step ? '✓' : i+1}
                 </div>
                 <span style={{ fontSize:11 }}>{label}</span>
@@ -228,143 +407,21 @@ export default function CalculatorCard() {
       )}
 
       {/* ── STEP 5: RESULTS ── */}
-      {step === 5 && estimate && (() => {
-        const { totalLow, totalMid, totalHigh, matMid, labMid, disposal, permit } = estimate
-        const tot = matMid + labMid + disposal + permit
-        const pcts = [Math.round(matMid/tot*100), Math.round(labMid/tot*100), Math.round(disposal/tot*100), Math.round(permit/tot*100)]
-        const contractors = getContractors(estimate.city?.city)
-        return (
-          <div>
-            <button onClick={restart} style={{ display:'flex', alignItems:'center', gap:6, color:'var(--burnt)', fontSize:12, fontWeight:500, padding:'14px 26px 0', background:'none', border:'none' }}>← Start over</button>
+      {step === 5 && estimate && (
+        <ResultsPanel estimate={estimate} onRestart={restart} />
+      )}
 
-            {/* Range */}
-            <div style={{ background:'var(--slate)', padding:'22px 26px 20px' }}>
-              <div style={{ fontSize:10.5, textTransform:'uppercase', letterSpacing:'0.1em', color:'rgba(255,255,255,0.4)', marginBottom:5 }}>Your estimated replacement cost</div>
-              <div style={{ fontFamily:'var(--font-display)', fontSize:38, fontWeight:900, color:'#fff', lineHeight:1 }}>
-                {fmt(totalLow)} – <span style={{ color:'var(--burnt-light)' }}>{fmt(totalHigh)}</span>
-              </div>
-              <div style={{ fontSize:11.5, color:'rgba(255,255,255,0.38)', marginTop:7, lineHeight:1.5 }}>
-                {estimate.homeSize?.label} home · {estimate.shape?.shape} roof · {estimate.material?.name} · {estimate.city?.city}, TX
-              </div>
-              <div style={{ display:'inline-flex', alignItems:'center', gap:5, background:'rgba(45,122,79,0.2)', borderRadius:20, padding:'4px 10px', fontSize:10.5, color:'#6FCF97', marginTop:10 }}>
-                ✓ No personal information was collected
-              </div>
-            </div>
-
-            {/* Breakdown */}
-            <div style={{ padding:'20px 26px' }}>
-              <div style={{ fontSize:10.5, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--muted)', fontWeight:500, marginBottom:14 }}>Where your money goes</div>
-              {[
-                { dot:'#C8572A', name:'Materials', sub:'Shingles, underlayment, flashing, ridge cap', amt:fmt(matMid) },
-                { dot:'#3D4A5C', name:'Labor',     sub:'Tear-off, installation, cleanup',             amt:fmt(labMid) },
-                { dot:'#D4A853', name:'Disposal',  sub:'Dumpster rental, haul-away',                  amt:fmt(disposal) },
-                { dot:'#9CA3AF', name:'Permit',    sub:'City / county building permit',                amt:fmt(permit) },
-              ].map(item => (
-                <div key={item.name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'11px 0', borderBottom:'1px solid var(--cream2)' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                    <div style={{ width:9, height:9, borderRadius:'50%', background:item.dot, flexShrink:0 }}/>
-                    <div>
-                      <div style={{ fontSize:13.5, color:'var(--slate)' }}>{item.name}</div>
-                      <div style={{ fontSize:10.5, color:'var(--light)', marginTop:1 }}>{item.sub}</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize:14.5, fontWeight:500, color:'var(--slate)' }}>{item.amt}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Bar chart */}
-            <div style={{ padding:'0 26px 20px' }}>
-              <div style={{ fontSize:10.5, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--muted)', fontWeight:500, marginBottom:14 }}>Cost distribution</div>
-              {[['Materials','#C8572A',pcts[0]],['Labor','#3D4A5C',pcts[1]],['Disposal','#D4A853',pcts[2]],['Permit','#9CA3AF',pcts[3]]].map(([lbl,clr,pct]) => (
-                <div key={lbl} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:9 }}>
-                  <div style={{ fontSize:11, color:'var(--muted)', width:66, textAlign:'right', flexShrink:0 }}>{lbl}</div>
-                  <Bar pct={pct} color={clr}/>
-                  <div style={{ fontSize:11, fontWeight:500, color:'var(--slate)', minWidth:30 }}>{pct}%</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Tiers */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, padding:'0 26px 18px' }}>
-              {[
-                { lbl:'Budget',   price:fmt(totalLow),  sub:'Entry-grade materials', mid:false },
-                { lbl:'Standard', price:fmt(totalMid),  sub:'Mid-grade quality',     mid:true  },
-                { lbl:'Premium',  price:fmt(totalHigh), sub:'Top-grade materials',   mid:false },
-              ].map(t => (
-                <div key={t.lbl} style={{ borderRadius:12, padding:'13px 10px', textAlign:'center', border:`1.5px solid ${t.mid ? 'var(--burnt)' : 'var(--cream2)'}`, position:'relative' }}>
-                  {t.mid && <div style={{ position:'absolute', top:-8, left:'50%', transform:'translateX(-50%)', background:'var(--burnt)', color:'#fff', fontSize:9, letterSpacing:'0.05em', padding:'2px 8px', borderRadius:10, whiteSpace:'nowrap' }}>Most common</div>}
-                  <div style={{ fontSize:9.5, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--muted)', marginBottom:5 }}>{t.lbl}</div>
-                  <div style={{ fontFamily:'var(--font-display)', fontSize:19, fontWeight:700, color:'var(--slate)' }}>{t.price}</div>
-                  <div style={{ fontSize:9.5, color:'var(--light)', marginTop:3 }}>{t.sub}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Contractors */}
-            <div style={{ padding:'0 26px 18px' }}>
-              <div style={{ fontSize:10.5, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--muted)', fontWeight:500, marginBottom:10 }}>Texas roofing companies near you</div>
-              <div style={{ fontSize:12, color:'var(--muted)', marginBottom:14, lineHeight:1.55, padding:'10px 12px', background:'var(--cream)', borderRadius:8, borderLeft:'3px solid var(--burnt)' }}>
-                Contact these contractors directly — we never share your information with anyone.
-              </div>
-              {contractors.map(c => (
-                <div key={c.name} style={{ border:'1.5px solid var(--cream2)', borderRadius:12, padding:14, marginBottom:9, display:'flex', alignItems:'center', gap:13, background:'#fff' }}>
-                  <div style={{ width:42, height:42, borderRadius:10, background:c.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, color:'#fff', flexShrink:0 }}>
-                    {c.name.split(' ').map(w=>w[0]).slice(0,2).join('')}
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:500, color:'var(--slate)' }}>{c.name}</div>
-                    <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>{c.metro}</div>
-                    <div style={{ display:'flex', gap:5, marginTop:6, flexWrap:'wrap' }}>
-                      <span style={{ fontSize:9.5, padding:'2px 7px', borderRadius:6, background:'var(--green-bg)', color:'var(--green)' }}>{c.badge}</span>
-                      {c.tags.map(t => <span key={t} style={{ fontSize:9.5, padding:'2px 7px', borderRadius:6, background:'var(--cream2)', color:'var(--muted)' }}>{t}</span>)}
-                    </div>
-                    <div style={{ fontSize:11, color:'var(--burnt)', marginTop:5, fontWeight:500 }}>{c.phone}</div>
-                  </div>
-                  <div style={{ textAlign:'right', flexShrink:0 }}>
-                    <div style={{ fontSize:11, color:'var(--gold)' }}>{c.stars}</div>
-                    <div style={{ fontSize:10, color:'var(--light)', marginTop:2 }}>{c.reviews}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Actions */}
-            <div style={{ padding:'0 26px 22px', display:'flex', flexDirection:'column', gap:9 }}>
-              <div style={{ fontSize:10.5, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--muted)', fontWeight:500 }}>What would you like to do next?</div>
-              {[
-                { icon:'📄', title:'Save estimate as PDF',           desc:'Free download — no email required' },
-                { icon:'🏠', title:'Best roofing materials for Texas',desc:'Heat, hail & humidity resistant options' },
-                { icon:'❓', title:'Questions to ask your contractor',desc:"Don't get ripped off — know what to ask" },
-              ].map(a => (
-                <div key={a.title} style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 14px', borderRadius:12, border:'1.5px solid var(--cream2)', cursor:'pointer', background:'#fff' }}>
-                  <div style={{ width:36, height:36, borderRadius:9, background:'var(--cream)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>{a.icon}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13.5, fontWeight:500, color:'var(--slate)' }}>{a.title}</div>
-                    <div style={{ fontSize:10.5, color:'var(--muted)', marginTop:1 }}>{a.desc}</div>
-                  </div>
-                  <div style={{ color:'var(--light)', fontSize:16 }}>›</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ padding:'14px 26px 22px', fontSize:10.5, color:'var(--light)', lineHeight:1.65, borderTop:'1px solid var(--cream2)' }}>
-              Estimates based on 2025 Texas labor and material costs. Actual quotes may vary 15–25%. This tool does not collect, store, or share any personal information.
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* BUTTONS — steps 2,3,4 only */}
-      {step >= 3 && step <= 4 && (
+      {/* ── NAVIGATION BUTTONS (steps 3 & 4 only) ── */}
+      {(step === 3 || step === 4) && (
         <div style={{ padding:'18px 26px 26px' }}>
           <button
-            onClick={step === 4 ? calculate : () => setStep(s => s+1)}
+            onClick={step === 4 ? calculate : () => setStep(s => s + 1)}
             disabled={!canNext()}
-            style={{ width:'100%', background: canNext() ? 'var(--burnt)' : 'var(--light)', color:'#fff', border:'none', borderRadius:12, padding:'17px 24px', fontSize:15.5, fontWeight:500, display:'flex', alignItems:'center', justifyContent:'center', gap:10, transition:'all 0.2s', cursor: canNext() ? 'pointer' : 'not-allowed' }}>
+            style={{ width:'100%', background: canNext() ? 'var(--burnt)' : 'var(--light)', color:'#fff', border:'none', borderRadius:12, padding:'17px 24px', fontSize:15.5, fontWeight:500, display:'flex', alignItems:'center', justifyContent:'center', gap:10, transition:'all 0.2s', cursor: canNext() ? 'pointer' : 'not-allowed' }}
+          >
             {step === 4 ? 'Calculate my estimate →' : 'Continue →'}
           </button>
-          <button onClick={() => setStep(s => s-1)} style={{ width:'100%', background:'transparent', border:'1.5px solid var(--cream2)', color:'var(--slate)', borderRadius:12, padding:13, fontSize:14, marginTop:9 }}>
+          <button onClick={() => setStep(s => s - 1)} style={{ width:'100%', background:'transparent', border:'1.5px solid var(--cream2)', color:'var(--slate)', borderRadius:12, padding:13, fontSize:14, marginTop:9, cursor:'pointer' }}>
             ← Go back
           </button>
         </div>
