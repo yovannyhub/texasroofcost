@@ -105,6 +105,7 @@ export function calculateEstimate({ sqft, pitch, ageFactor, costLow, costHigh, l
   return { totalLow, totalMid, totalHigh, matMid, labMid, disposal, permit, roofArea: Math.round(roofArea) }
 }
 
-export const fmt = (n) => '$' + Math.round(n / 100) * 100 > 0
-  ? '$' + (Math.round(n / 100) * 100).toLocaleString()
-  : '$0'
+export const fmt = (n) => {
+  const rounded = Math.round(n / 100) * 100
+  return '$' + rounded.toLocaleString()
+}
