@@ -1,0 +1,124 @@
+.hero {
+  position: relative;
+  background: var(--slate);
+  padding: 50px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+.heroGrid {
+  position: absolute; inset: 0; opacity: 0.05;
+  background-image: linear-gradient(var(--burnt) 1px, transparent 1px),
+                    linear-gradient(90deg, var(--burnt) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+.heroGlow {
+  position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
+  width: 500px; height: 360px;
+  background: radial-gradient(ellipse, rgba(200,87,42,0.22) 0%, transparent 70%);
+  pointer-events: none;
+}
+.badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(200,87,42,0.15); border: 1px solid rgba(200,87,42,0.3);
+  color: var(--burnt-light); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  padding: 5px 14px; border-radius: 20px; margin-bottom: 20px;
+  animation: fadeUp 0.5s ease both;
+}
+.badgeDot {
+  width: 6px; height: 6px; background: var(--burnt-light);
+  border-radius: 50%; animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+.heroTitle {
+  font-family: var(--font-display); font-size: clamp(30px,5vw,50px); font-weight: 900;
+  color: #fff; text-align: center; line-height: 1.1; max-width: 580px;
+  animation: fadeUp 0.55s ease 0.08s both;
+}
+.heroEm { color: var(--burnt-light); font-style: normal; }
+.heroSub {
+  color: rgba(255,255,255,0.5); font-size: 15px; font-weight: 300;
+  text-align: center; margin-top: 12px; max-width: 400px; line-height: 1.65;
+  animation: fadeUp 0.55s ease 0.16s both;
+}
+.trustRow {
+  display: flex; gap: 18px; margin-top: 24px;
+  flex-wrap: wrap; justify-content: center;
+  animation: fadeUp 0.55s ease 0.24s both;
+}
+.trustItem {
+  display: flex; align-items: center; gap: 6px;
+  color: rgba(255,255,255,0.4); font-size: 11.5px;
+}
+
+/* Card */
+.cardWrap {
+  max-width: 660px; margin: -58px auto 0;
+  padding: 0 18px 60px; position: relative; z-index: 10;
+}
+.card {
+  background: #fff; border-radius: 22px;
+  box-shadow: var(--shadow-card); overflow: hidden;
+}
+
+/* Progress */
+.progressBar { height: 3px; background: var(--cream2); }
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--burnt), var(--burnt-light));
+  transition: width 0.55s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* Step dots */
+.stepsHeader {
+  display: flex; align-items: center;
+  padding: 18px 26px 0; gap: 0;
+}
+.sdot {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11.5px; color: var(--light); font-weight: 500;
+  transition: color 0.3s; white-space: nowrap;
+}
+.sdotActive { color: var(--burnt); }
+.sdotDone   { color: var(--slate3); }
+.snum {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1.5px solid currentColor;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600; flex-shrink: 0;
+  transition: all 0.3s;
+}
+.sdotActive .snum { background: var(--burnt); border-color: var(--burnt); color: #fff; }
+.sdotDone   .snum { background: var(--slate); border-color: var(--slate); color: #fff; }
+.sdotLabel { font-size: 11px; }
+.sline { flex: 1; height: 1px; background: var(--cream2); margin: 0 6px; }
+
+/* Panel */
+.panelWrap {
+  padding: 26px 26px 6px;
+  animation: pIn 0.3s ease both;
+}
+@keyframes pIn { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+
+/* Buttons */
+.btnWrap { padding: 18px 26px 26px; }
+.ctaBtn {
+  width: 100%; background: var(--burnt); color: #fff; border: none;
+  border-radius: 12px; padding: 17px 24px;
+  font-family: var(--font-body); font-size: 15.5px; font-weight: 500;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  transition: all 0.2s;
+}
+.ctaBtn:hover { background: var(--burnt-dark); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(200,87,42,0.32); }
+.ctaBtn:active { transform: translateY(0); }
+.ctaBtn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+.backBtn {
+  width: 100%; background: transparent; border: 1.5px solid var(--cream2);
+  color: var(--slate); border-radius: 12px; padding: 13px;
+  font-size: 14px; margin-top: 9px; transition: all 0.18s;
+}
+.backBtn:hover { background: var(--cream); }
